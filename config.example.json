@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy this to config.json, or just run `npx brightspace-mcp setup` which writes config.json for you. courseCodes is optional: list_courses only returns courses whose D2L code or name contains one of these (substring match, ignoring spaces/dashes/case). Clear it to see every enrollment D2L returns, old ones included.",
+  "d2lBaseUrl": "https://d2l.myschool.edu",
+  "courseCodes": ["CSE404", "STT404"]
+}

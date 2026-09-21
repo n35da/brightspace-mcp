@@ -1,0 +1,9 @@
+node_modules/
+*.log
+downloads/
+notes/
+exports/
+.smoke-state/
+.worktrees/
+.superpowers/
+config.json

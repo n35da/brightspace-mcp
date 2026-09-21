@@ -1,0 +1,25 @@
+{
+  "name": "brightspace-mcp",
+  "version": "0.1.0",
+  "description": "Read-only MCP server for Brightspace (D2L) courses at any institution — talks to D2L's own JSON API instead of driving a browser.",
+  "type": "module",
+  "files": ["server.mjs", "auth.mjs", "bin/", "lib/", "config.example.json", "README.md"],
+  "bin": {
+    "brightspace-mcp": "./server.mjs",
+    "brightspace-mcp-setup": "./bin/setup.mjs",
+    "brightspace-mcp-auth": "./auth.mjs"
+  },
+  "scripts": {
+    "setup": "node bin/setup.mjs",
+    "auth": "node auth.mjs",
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "playwright": "^1.63.0",
+    "zod": "^4.6.0"
+  }
+}
