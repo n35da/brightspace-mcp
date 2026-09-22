@@ -1,6 +1,6 @@
 {
   "name": "@n35da/brightspace-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Read-only MCP server for Brightspace (D2L) courses at any institution — talks to D2L's own JSON API instead of driving a browser.",
   "type": "module",
   "publishConfig": {

@@ -61,9 +61,9 @@ npx @n35da/brightspace-mcp setup
 This will:
 1. Ask for your school's Brightspace URL (e.g. `https://d2l.myschool.edu`) and optional course-code filters.
 2. Open a real, visible browser window for you to log in with your school SSO and approve any 2FA yourself. This script never sees your password unless you explicitly opt in to saving it (see [Automated re-login](#automated-re-login)).
-3. Automatically add `@n35da/brightspace-mcp` to Claude Desktop's config, wherever your OS/install keeps it.
+3. Ask whether to wire into Claude Desktop, Claude Code, or both, then do it automatically: Desktop gets its config file updated wherever your OS/install keeps it, Code gets `claude mcp add` run for you (available in every project).
 
-Then fully quit and relaunch Claude Desktop. No cloning, no manual JSON editing, no local install required.
+Then fully quit and relaunch whichever client(s) you configured. No cloning, no manual JSON editing, no local install required.
 
 If you'd rather run from source (e.g. to read or modify the code):
 ```bash
@@ -99,6 +99,16 @@ Config file locations:
 | Linux | `~/.config/Claude/claude_desktop_config.json` |
 
 Then fully restart Claude Desktop.
+
+### Manual Claude Code config
+
+If the setup script couldn't find the `claude` command, or you'd prefer to wire it in yourself:
+
+```bash
+claude mcp add --transport stdio --scope user brightspace -- npx -y @n35da/brightspace-mcp
+```
+
+`--scope user` registers it for every project, not just the one you're currently in.
 
 ## How this works (and what it does with your login)
 

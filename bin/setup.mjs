@@ -13,8 +13,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig, writeConfig, checkBrightspaceUrl } from "../lib/config.mjs";
 import { resolveClaudeConfigPath, mergeMcpServerEntry } from "../lib/claudeConfig.mjs";
+import { buildAddArgs, buildRemoveArgs } from "../lib/claudeCodeConfig.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MCP_SERVER_ENTRY = { command: "npx", args: ["-y", "@n35da/brightspace-mcp"] };
 
 async function prompt(question) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -23,6 +25,82 @@ async function prompt(question) {
   } finally {
     rl.close();
   }
+}
+
+/** Ask which Claude client(s) to wire into. Loops until at least one is
+ * picked — "neither" isn't a usable answer for a setup wizard whose whole
+ * job is to wire something in. */
+async function promptTargets() {
+  for (;;) {
+    const answer = (await prompt("Which do you want to configure — Claude Desktop, Claude Code, or both? [desktop/code/both]: ")).toLowerCase();
+    const desktop = answer.includes("desktop") || answer.includes("both");
+    const code = answer.includes("code") || answer.includes("both");
+    if (desktop || code) return { desktop, code };
+    console.log("Please choose desktop, code, or both — at least one is required.\n");
+  }
+}
+
+function runCommand(command, args) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { stdio: "ignore" });
+    child.on("error", () => resolve({ ok: false, spawnError: true }));
+    child.on("exit", (exitCode) => resolve({ ok: exitCode === 0, exitCode }));
+  });
+}
+
+async function wireClaudeDesktop() {
+  console.log("\nWiring into Claude Desktop...");
+  const configPath = resolveClaudeConfigPath({
+    platform: process.platform,
+    homedir: os.homedir(),
+    env: process.env,
+    existsSync,
+    readdirSync,
+  });
+
+  if (!configPath) {
+    console.log(
+      "\nCouldn't find a Claude Desktop config file. Launch Claude Desktop at least once, then re-run `npx @n35da/brightspace-mcp setup`,\n" +
+        "or add this to its config yourself under \"mcpServers\":\n\n" +
+        JSON.stringify({ brightspace: MCP_SERVER_ENTRY }, null, 2)
+    );
+    return;
+  }
+
+  const existingText = existsSync(configPath) ? await readFile(configPath, "utf8") : null;
+  const merged = mergeMcpServerEntry(existingText, "brightspace", MCP_SERVER_ENTRY);
+  await writeFile(configPath, merged, "utf8");
+
+  console.log(`Done. Updated ${configPath}.`);
+  console.log("Fully quit and relaunch Claude Desktop to start using it.");
+}
+
+async function wireClaudeCode() {
+  console.log("\nWiring into Claude Code...");
+  const versionCheck = await runCommand("claude", ["--version"]);
+  if (versionCheck.spawnError) {
+    console.log(
+      "\nCouldn't find the `claude` command on your PATH. Install Claude Code, then run this yourself:\n\n" +
+        `  claude ${buildAddArgs({ name: "brightspace", command: MCP_SERVER_ENTRY.command, args: MCP_SERVER_ENTRY.args }).join(" ")}\n`
+    );
+    return;
+  }
+
+  // Re-running setup shouldn't error just because it's already wired —
+  // `claude mcp add` fails if the name exists, so clear it first (ignore
+  // failure: a fresh install has nothing to remove).
+  await runCommand("claude", buildRemoveArgs({ name: "brightspace" }));
+  const added = await runCommand("claude", buildAddArgs({ name: "brightspace", command: MCP_SERVER_ENTRY.command, args: MCP_SERVER_ENTRY.args }));
+
+  if (!added.ok) {
+    console.log(
+      "\n`claude mcp add` failed. Run this yourself to see why:\n\n" +
+        `  claude ${buildAddArgs({ name: "brightspace", command: MCP_SERVER_ENTRY.command, args: MCP_SERVER_ENTRY.args }).join(" ")}\n`
+    );
+    return;
+  }
+
+  console.log("Done. Registered with Claude Code (available in every project).");
 }
 
 async function main() {
@@ -63,30 +141,11 @@ async function main() {
     child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`Login failed (exit ${code})`))));
   });
 
-  console.log("\nWiring into Claude Desktop...");
-  const configPath = resolveClaudeConfigPath({
-    platform: process.platform,
-    homedir: os.homedir(),
-    env: process.env,
-    existsSync,
-    readdirSync,
-  });
+  const targets = await promptTargets();
+  if (targets.desktop) await wireClaudeDesktop();
+  if (targets.code) await wireClaudeCode();
 
-  if (!configPath) {
-    console.log(
-      "\nCouldn't find a Claude Desktop config file. Launch Claude Desktop at least once, then re-run `npx @n35da/brightspace-mcp setup`,\n" +
-        "or add this to its config yourself under \"mcpServers\":\n\n" +
-        JSON.stringify({ brightspace: { command: "npx", args: ["-y", "@n35da/brightspace-mcp"] } }, null, 2)
-    );
-    return;
-  }
-
-  const existingText = existsSync(configPath) ? await readFile(configPath, "utf8") : null;
-  const merged = mergeMcpServerEntry(existingText, "brightspace", { command: "npx", args: ["-y", "@n35da/brightspace-mcp"] });
-  await writeFile(configPath, merged, "utf8");
-
-  console.log(`\nDone. Updated ${configPath}.`);
-  console.log("Fully quit and relaunch Claude Desktop to start using it.\n");
+  console.log("\nAll done. Fully quit and relaunch whichever client(s) you configured to start using it.\n");
 }
 
 main().catch((err) => {
