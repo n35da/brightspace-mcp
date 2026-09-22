@@ -29,7 +29,9 @@ below).
 
 - **Course browsing**: list your enrolled courses, walk a course's full
   content tree (modules, lecture slides, syllabus links), and download any
-  file-type content topic straight to disk.
+  file-type content topic straight to disk. Files under 10 MB are also
+  embedded directly in the tool response, so Claude can read them right
+  away without a separate filesystem-permission prompt.
 - **Assignments & grades**: see every dropbox folder's due date, points,
   and instructor-provided attachments; check whether you've already
   submitted and download your own submitted files; read your quiz list and
@@ -171,10 +173,10 @@ your real course codes look like.
 | `reauthenticate` | Manually trigger a headless re-login and refresh the saved session. |
 | `list_courses` | List your enrolled courses (respecting `courseCodes`), with each `orgUnitId`. |
 | `get_course_content` | Walk one course's full content tree (modules, lecture materials, syllabus links), flattened with module paths. |
-| `download_content_file` | Download a file-type content topic (syllabus PDF, slides) to disk. |
+| `download_content_file` | Download a file-type content topic (syllabus PDF, slides) to disk, embedding its contents directly in the response when it's small enough. |
 | `get_assignments` | List a course's dropbox folders: due dates, points, instructor attachments, your own submission status. |
-| `download_assignment_attachment` | Download an instructor-provided attachment on a dropbox folder (starter code, instructions). |
-| `download_submission_file` | Download a file you previously submitted to a dropbox folder. |
+| `download_assignment_attachment` | Download an instructor-provided attachment on a dropbox folder (starter code, instructions), embedded directly when small enough. |
+| `download_submission_file` | Download a file you previously submitted to a dropbox folder, embedded directly when small enough. |
 | `get_quizzes` | List a course's quizzes with dates and active status. |
 | `get_grades` | Read your own grade values for every graded item in a course. |
 | `get_announcements` | Recent announcements/news posts for a course. |

@@ -27,6 +27,7 @@ import { getContentTree } from "./lib/content.mjs";
 import { saveDownload } from "./lib/downloads.mjs";
 import { NOTES_SECTIONS, notesPathFor, readClassNotes, saveClassNotesSection } from "./lib/notes.mjs";
 import { deadlinesExportShape, buildAndSaveDeadlinesExport } from "./lib/deadlinesExport.mjs";
+import { buildResourceContent, MAX_INLINE_BYTES } from "./lib/resourceContent.mjs";
 
 const server = new McpServer(
   { name: "brightspace-mcp", version: "0.1.0" },
@@ -79,6 +80,32 @@ function failMessage(text) {
   return { content: [{ type: "text", text }], isError: true };
 }
 
+/** A handler normally returns plain data, which gets JSON-stringified into
+ * one text block. A handler that needs extra content blocks (e.g. an
+ * embedded file resource) returns a pre-built { content: [...] } object
+ * directly instead, and this passes it through unchanged. */
+function toToolResult(result) {
+  if (result && Array.isArray(result.content)) return result;
+  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+}
+
+/** Build a download tool's result: the usual JSON metadata, plus (when the
+ * file is under MAX_INLINE_BYTES) an embedded resource content block so the
+ * calling model can read the file straight from the conversation instead of
+ * needing separate filesystem-read permission for the saved path. */
+function downloadToolResult({ buffer, contentType, filename, savedTo }) {
+  const resource = buildResourceContent({ buffer, contentType, filename, savedTo });
+  const meta = {
+    savedTo,
+    filename,
+    contentType,
+    sizeBytes: buffer.length,
+    inlined: !!resource,
+    ...(resource ? {} : { inlineSkippedReason: `file exceeds the ${MAX_INLINE_BYTES}-byte inline limit; read it from savedTo instead` }),
+  };
+  return { content: [{ type: "text", text: JSON.stringify(meta, null, 2) }, ...(resource ? [resource] : [])] };
+}
+
 /** Wrap a tool handler so a dead session transparently triggers one headless
  * re-login + retry before surfacing the expiry to the caller. */
 function withClient(fn) {
@@ -89,7 +116,7 @@ function withClient(fn) {
     };
     try {
       const result = await run();
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      return toToolResult(result);
     } catch (err) {
       if (err instanceof SessionExpiredError) {
         let reauth = null;
@@ -97,7 +124,7 @@ function withClient(fn) {
         if (reauth?.ok) {
           try {
             const result = await run();
-            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+            return toToolResult(result);
           } catch (retryErr) {
             return failMessage(retryErr instanceof SessionExpiredError ? retryErr.message : `Error: ${retryErr.message}`);
           }
@@ -154,7 +181,7 @@ server.registerTool(
   "download_content_file",
   {
     title: "Download a course content file",
-    description: "Download a file-type content topic (lecture slides, syllabus PDF, etc) to local disk and return where it was saved. Get topicId from get_course_content (only topics with downloadable: true are file topics).",
+    description: "Download a file-type content topic (lecture slides, syllabus PDF, etc), saving it to local disk. When the file is small enough, its contents are also embedded directly in this response so you can read it right away without a separate filesystem-read permission prompt (check `inlined` in the result). Get topicId from get_course_content (only topics with downloadable: true are file topics).",
     inputSchema: {
       orgUnitId: z.number().describe("The course's orgUnitId from list_courses"),
       topicId: z.number().describe("The topic's id from get_course_content"),
@@ -165,7 +192,7 @@ server.registerTool(
       c.le(orgUnitId, `/content/topics/${topicId}/file`)
     );
     const savedTo = await saveDownload(buffer, filename || `topic-${topicId}`, topicId);
-    return { savedTo, filename: filename ?? path.basename(savedTo), contentType, sizeBytes: buffer.length };
+    return downloadToolResult({ buffer, contentType, filename: filename ?? path.basename(savedTo), savedTo });
   })
 );
 
@@ -223,7 +250,7 @@ server.registerTool(
   "download_assignment_attachment",
   {
     title: "Download an assignment's instructor-provided attachment",
-    description: "Download a file the instructor attached directly to a dropbox assignment folder (e.g. starter code, a .ipynb template, instructions) — distinct from a student's own submission files. Get folderId and fileId from get_assignments' attachments list.",
+    description: "Download a file the instructor attached directly to a dropbox assignment folder (e.g. starter code, a .ipynb template, instructions) — distinct from a student's own submission files. Saves to local disk, and when the file is small enough its contents are also embedded directly in this response so you can read it right away without a separate filesystem-read permission prompt (check `inlined` in the result). Get folderId and fileId from get_assignments' attachments list.",
     inputSchema: {
       orgUnitId: z.number().describe("The course's orgUnitId from list_courses"),
       folderId: z.number().describe("The dropbox folder id from get_assignments"),
@@ -235,7 +262,7 @@ server.registerTool(
       c.le(orgUnitId, `/dropbox/folders/${folderId}/attachments/${fileId}`)
     );
     const savedTo = await saveDownload(buffer, filename || `assignment-attachment-${fileId}`, fileId);
-    return { savedTo, filename: filename ?? path.basename(savedTo), contentType, sizeBytes: buffer.length };
+    return downloadToolResult({ buffer, contentType, filename: filename ?? path.basename(savedTo), savedTo });
   })
 );
 
@@ -243,7 +270,7 @@ server.registerTool(
   "download_submission_file",
   {
     title: "Download a dropbox submission file",
-    description: "Download a file you submitted to a dropbox assignment folder, to local disk. Get folderId, submissionId, and fileId from get_assignments' submission.files list.",
+    description: "Download a file you submitted to a dropbox assignment folder, to local disk. When the file is small enough, its contents are also embedded directly in this response so you can read it right away without a separate filesystem-read permission prompt (check `inlined` in the result). Get folderId, submissionId, and fileId from get_assignments' submission.files list.",
     inputSchema: {
       orgUnitId: z.number().describe("The course's orgUnitId from list_courses"),
       folderId: z.number().describe("The dropbox folder id from get_assignments"),
@@ -256,7 +283,7 @@ server.registerTool(
       c.le(orgUnitId, `/dropbox/folders/${folderId}/submissions/${submissionId}/files/${fileId}`)
     );
     const savedTo = await saveDownload(buffer, filename || `submission-file-${fileId}`, fileId);
-    return { savedTo, filename: filename ?? path.basename(savedTo), contentType, sizeBytes: buffer.length };
+    return downloadToolResult({ buffer, contentType, filename: filename ?? path.basename(savedTo), savedTo });
   })
 );
 
