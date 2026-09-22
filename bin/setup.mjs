@@ -3,7 +3,7 @@
 // instance and courses to use, run the existing browser login, and wire the
 // server into Claude Desktop's config automatically.
 //
-// Run via: npx brightspace-mcp setup
+// Run via: npx @n35da/brightspace-mcp setup
 import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
@@ -74,15 +74,15 @@ async function main() {
 
   if (!configPath) {
     console.log(
-      "\nCouldn't find a Claude Desktop config file. Launch Claude Desktop at least once, then re-run `npx brightspace-mcp setup`,\n" +
+      "\nCouldn't find a Claude Desktop config file. Launch Claude Desktop at least once, then re-run `npx @n35da/brightspace-mcp setup`,\n" +
         "or add this to its config yourself under \"mcpServers\":\n\n" +
-        JSON.stringify({ brightspace: { command: "npx", args: ["-y", "brightspace-mcp"] } }, null, 2)
+        JSON.stringify({ brightspace: { command: "npx", args: ["-y", "@n35da/brightspace-mcp"] } }, null, 2)
     );
     return;
   }
 
   const existingText = existsSync(configPath) ? await readFile(configPath, "utf8") : null;
-  const merged = mergeMcpServerEntry(existingText, "brightspace", { command: "npx", args: ["-y", "brightspace-mcp"] });
+  const merged = mergeMcpServerEntry(existingText, "brightspace", { command: "npx", args: ["-y", "@n35da/brightspace-mcp"] });
   await writeFile(configPath, merged, "utf8");
 
   console.log(`\nDone. Updated ${configPath}.`);

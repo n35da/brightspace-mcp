@@ -105,7 +105,7 @@ function withClient(fn) {
         const reason = reauth && !reauth.ok ? ` (automatic re-login failed: ${reauth.reason})` : "";
         return failMessage(
           `Your D2L session has expired${reason}. Call the reauthenticate tool to log in again automatically; ` +
-            `if that fails, ask the user to run \`npx brightspace-mcp setup\` again.`
+            `if that fails, ask the user to run \`npx @n35da/brightspace-mcp setup\` again.`
         );
       }
       return failMessage(`Error: ${err.message}`);
@@ -118,7 +118,7 @@ server.registerTool(
   {
     title: "Re-authenticate the D2L session",
     description:
-      "Log in to Brightspace headlessly (using the saved browser profile's SSO session, or the user's saved credentials as a fallback) and refresh the saved session so the other tools work again. Use this when another tool reports the D2L session expired. Takes no arguments. If it reports failure, ask the user to run `npx brightspace-mcp setup` again and log in manually — never ask the user to type their password to you.",
+      "Log in to Brightspace headlessly (using the saved browser profile's SSO session, or the user's saved credentials as a fallback) and refresh the saved session so the other tools work again. Use this when another tool reports the D2L session expired. Takes no arguments. If it reports failure, ask the user to run `npx @n35da/brightspace-mcp setup` again and log in manually — never ask the user to type their password to you.",
     inputSchema: {},
   },
   async () => {

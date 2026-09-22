@@ -53,13 +53,13 @@ below).
 ## Quick start
 
 ```bash
-npx brightspace-mcp setup
+npx @n35da/brightspace-mcp setup
 ```
 
 This will:
 1. Ask for your school's Brightspace URL (e.g. `https://d2l.myschool.edu`) and optional course-code filters.
 2. Open a real, visible browser window for you to log in with your school SSO and approve any 2FA yourself. This script never sees your password unless you explicitly opt in to saving it (see [Automated re-login](#automated-re-login)).
-3. Automatically add `brightspace-mcp` to Claude Desktop's config, wherever your OS/install keeps it.
+3. Automatically add `@n35da/brightspace-mcp` to Claude Desktop's config, wherever your OS/install keeps it.
 
 Then fully quit and relaunch Claude Desktop. No cloning, no manual JSON editing, no local install required.
 
@@ -82,7 +82,7 @@ to wire it in manually, add this under `"mcpServers"`:
   "mcpServers": {
     "brightspace": {
       "command": "npx",
-      "args": ["-y", "brightspace-mcp"]
+      "args": ["-y", "@n35da/brightspace-mcp"]
     }
   }
 }
@@ -135,7 +135,7 @@ everything from the web interface. Here's what happens:
    into your school's login form. If your school then issues a 2FA
    challenge anyway, it stops and the `reauthenticate` tool reports
    failure. At that point (and only then) a human runs
-   `npx brightspace-mcp setup` again.
+   `npx @n35da/brightspace-mcp setup` again.
 
 This is unofficial. It's not sanctioned by D2L or your school, it's just
 using your own login the way the website already does. It's read-only and
@@ -150,7 +150,7 @@ Brightspace's "active enrollment" flag doesn't mean "current semester." It
 stays true for old courses too, so without this filter you'd see every
 course you've ever taken.
 
-Use `npx brightspace-mcp setup` to configure course codes each semester
+Use `npx @n35da/brightspace-mcp setup` to configure course codes each semester
 (the normal way). If you prefer to edit `config.json` manually, it contains:
 ```json
 {
@@ -220,7 +220,7 @@ its own before reporting anything:
    challenges anyway, automation stops there. No machine can approve 2FA
    for you.
 3. **Manual fallback**: the `reauthenticate` tool reports why it failed,
-   and a human runs `npx brightspace-mcp setup` again.
+   and a human runs `npx @n35da/brightspace-mcp setup` again.
 
 The `reauthenticate` tool exists for the agent to retry on purpose (e.g.
 after you've fixed something); ordinary tool calls attempt recovery
@@ -236,7 +236,7 @@ just offer to save it again next manual login.
 ## When it stops working
 
 - **`reauthenticate` returns `"reason": "duo"` or repeated failures**: run
-  `npx brightspace-mcp setup`, log in, tick any "remember me" option, and
+  `npx @n35da/brightspace-mcp setup`, log in, tick any "remember me" option, and
   answer `y` to saving credentials.
 - **A course 403s on assignments/quizzes**: normal for past-semester or
   not-yet-released content; the tool just skips it.
