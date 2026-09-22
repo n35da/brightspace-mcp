@@ -3,6 +3,7 @@ node_modules/
 downloads/
 notes/
 exports/
+audits/
 .smoke-state/
 .worktrees/
 .superpowers/

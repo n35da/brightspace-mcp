@@ -41,7 +41,7 @@ const server = http.createServer(async (req, res) => {
             { Id: 300, Title: "Marked broken in D2L", Type: 1 },
           ],
         },
-        { Id: 20, Title: "Admin", Type: 0, Structure: [{ Id: 400, Title: "Syllabus", Type: 1 }] },
+        { Id: 20, Title: "Admin", Type: 0, Structure: [{ Id: 400, Title: "Syllabus", Type: 1 }, { Id: 500, Title: "Lecture video", Type: 1 }] },
       ])
     );
     return;
@@ -55,7 +55,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(id === 300 ? JSON.stringify({ Id: 300, TopicType: 1, IsBroken: true, Url: null }) : topicDetail(id));
+    if (id === 300) {
+      res.end(JSON.stringify({ Id: 300, TopicType: 1, IsBroken: true, Url: null }));
+    } else if (id === 500) {
+      // Same TopicType/IsBroken as a real file — D2L's own auto-generated
+      // HTML wrapper for an embedded video player, distinguishable only by
+      // the Url's extension (confirmed against real D2L data).
+      res.end(JSON.stringify({ Id: 500, TopicType: 1, IsBroken: false, Url: "/content/enforced/500-Lecture Video.html" }));
+    } else {
+      res.end(topicDetail(id));
+    }
     return;
   }
   res.writeHead(404);
@@ -93,7 +102,7 @@ async function main() {
   }
 
   assert(error === null, `tree survives a 404ing topic (got error: ${error?.message?.split("\n")[0]})`);
-  assert(tree?.length === 4, `all four topics listed (got ${tree?.length})`);
+  assert(tree?.length === 5, `all five topics listed (got ${tree?.length})`);
 
   const broken = tree?.find((t) => t.id === BROKEN_ID);
   assert(broken?.title === "Dangling reference", "broken topic keeps its TOC title");
@@ -109,6 +118,12 @@ async function main() {
 
   const syllabus = tree?.find((t) => t.id === 400);
   assert(syllabus?.modulePath === "Admin", "second module's topics walked fine");
+
+  const video = tree?.find((t) => t.id === 500);
+  assert(
+    video?.topicType === 1 && video?.isBroken === false && video?.downloadable === false,
+    "TopicType 1 + IsBroken false HTML-wrapper video topic is NOT downloadable (would always return HTML instead of a file)"
+  );
 
   server.close(() => {});
   await rm(process.env.MSU_D2L_SESSION_DIR, { recursive: true, force: true });

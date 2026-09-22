@@ -29,9 +29,12 @@ below).
 
 - **Course browsing**: list your enrolled courses, walk a course's full
   content tree (modules, lecture slides, syllabus links), and download any
-  file-type content topic straight to disk. Files under 10 MB are also
-  embedded directly in the tool response, so Claude can read them right
-  away without a separate filesystem-permission prompt.
+  file-type content topic straight to disk. Small plain-text files
+  (markdown, JSON, `.ipynb`, etc) are also embedded directly in the tool
+  response, so Claude can read them right away without a separate
+  filesystem-permission prompt. PDFs, Office formats, and other binary
+  files always save to disk only — reading those needs Claude's own
+  document tooling on the saved path.
 - **Assignments & grades**: see every dropbox folder's due date, points,
   and instructor-provided attachments; check whether you've already
   submitted and download your own submitted files; read your quiz list and
@@ -183,17 +186,20 @@ your real course codes look like.
 | `reauthenticate` | Manually trigger a headless re-login and refresh the saved session. |
 | `list_courses` | List your enrolled courses (respecting `courseCodes`), with each `orgUnitId`. |
 | `get_course_content` | Walk one course's full content tree (modules, lecture materials, syllabus links), flattened with module paths. |
-| `download_content_file` | Download a file-type content topic (syllabus PDF, slides) to disk, embedding its contents directly in the response when it's small enough. |
+| `download_content_file` | Download a file-type content topic (syllabus PDF, slides) to disk, embedding small plain-text files directly in the response. |
 | `get_assignments` | List a course's dropbox folders: due dates, points, instructor attachments, your own submission status. |
-| `download_assignment_attachment` | Download an instructor-provided attachment on a dropbox folder (starter code, instructions), embedded directly when small enough. |
-| `download_submission_file` | Download a file you previously submitted to a dropbox folder, embedded directly when small enough. |
+| `download_assignment_attachment` | Download an instructor-provided attachment on a dropbox folder (starter code, instructions); small plain-text files embed directly. |
+| `download_submission_file` | Download a file you previously submitted to a dropbox folder; small plain-text files embed directly. |
 | `get_quizzes` | List a course's quizzes with dates and active status. |
 | `get_grades` | Read your own grade values for every graded item in a course. |
 | `get_announcements` | Recent announcements/news posts for a course. |
 | `get_upcoming_due_dates` | Everything due across every enrolled course within a given window, soonest first. |
 | `get_class_notes` | Read a course's persistent markdown notes file. |
 | `save_class_notes` | Write/update one section of a course's persistent notes file. |
-| `export_calendar_json` | Build and save a schema-validated JSON export for the [optional companion calendar](#optional-companion-web-calendar). |
+| `export_calendar_json` | **Expensive.** Full-term audit export for the [optional companion calendar](#optional-companion-web-calendar); mechanically rejects the call if any course document/assignment/quiz wasn't actually checked. |
+| `update_calendar_json` | Cheap patch to an existing `export_calendar_json` output — add/fix a few items, no D2L calls, no coverage check. |
+| `full_course_audit` | **Expensive.** Same mechanically-verified full-term audit, for anyone not using the companion calendar; saves a plain JSON audit instead of the calendar app's schema. |
+| `update_course_audit` | Cheap patch to an existing `full_course_audit` output — add/fix a few items, no D2L calls, no coverage check. |
 
 ## Optional companion: web calendar
 
@@ -204,16 +210,33 @@ manual editing that survives across sessions and re-imports. It's entirely
 optional. Nothing in this MCP depends on it, and every tool works
 completely on its own without it.
 
-To use it, ask Claude to compile your deadlines. It'll use
-`get_assignments`, `get_quizzes`, the syllabus, and any other course
-document it can find, since real due dates are often only posted in a
-syllabus or lecture slide and never show up in D2L's own dropbox/quiz data.
-Then call the `export_calendar_json` tool with what it found. That writes
-a JSON file to `exports/` matching the calendar app's schema, validated and
-cross-checked before it's saved so the file can't be subtly malformed.
-Import that file at the URL above to get a working calendar. Re-running the
-export and re-importing later keeps your completion state, since events are
-matched by a stable id.
+To use it, ask Claude to compile your deadlines, then call
+`export_calendar_json` with what it found. **This is expensive and
+mechanically verified, not just a suggestion**: the tool independently
+re-fetches every configured course's live content, assignments, and quizzes
+itself, and rejects the call outright — naming exactly what's missing — if
+any document, assignment, or quiz wasn't actually checked. Instruction
+wording alone (across three earlier iterations) never reliably matched a
+maximally diligent one-off audit, so this closes the gap by refusing to
+proceed on an incomplete one rather than hoping the calling model was
+thorough. Only ask for this when you want a real full-term audit, not for a
+quick "what's due soon" check.
+
+If you don't use the calendar app, `full_course_audit` does the exact same
+mechanically-verified audit and just returns/saves a plain JSON result
+instead (`audits/`, no calendar-app schema).
+
+Once one of these exists, you don't need to redo the whole expensive audit
+for a small change. "There's a new assignment" or "fix this one date" is
+what `update_calendar_json`/`update_course_audit` are for: a cheap patch to
+the existing file — no D2L calls, no coverage check — that adds or replaces
+a few deadlines by id (and unscheduled items by course+title) while leaving
+everything else untouched.
+
+The resulting file is validated and cross-checked before it's saved so it
+can't be subtly malformed. Import it at the URL above to get a working
+calendar. Re-running the export and re-importing later keeps your
+completion state, since events are matched by a stable id.
 
 It's a separate account system from Brightspace. No D2L credentials or
 session data ever reach it, only whatever deadlines you choose to export.
@@ -264,7 +287,9 @@ node test/config.test.mjs          # config.json loading and validation
 node test/auth-baseurl.test.mjs    # URL validation
 node test/claudeConfig.test.mjs    # Claude Desktop config path detection and merging
 node test/setupHelpers.test.mjs    # setup.mjs helper functions
-node test/deadlinesExport.test.mjs # export_calendar_json schema validation
+node test/deadlinesExport.test.mjs # export_calendar_json + update_calendar_json
+node test/fullCourseAudit.test.mjs # full_course_audit + update_course_audit
+node test/courseAudit.test.mjs     # the shared mechanical coverage-check engine
 node test/content.test.mjs         # content-tree walking against a fake D2L
 node test/credentials.test.mjs
 node test/reauth.test.mjs          # headless login vs a fake Brightspace (password/SSO/2FA paths)
